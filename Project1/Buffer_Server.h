@@ -13,20 +13,20 @@ public:
 
 	void ResizeBuffer(size_t size);
 
+	std::vector<char> GetBuffer();
+	void SetBuffer(std::vector<char> buffer);
+
 	void WriteInt32LE(int value);
 	int ReadInt32LE(void);
 
 	void WriteShort16LE(short value);
 	short ReadShort16LE(void);
 
-	//void WriteChar8LE(uint8_t letter);
-	//char ReadChar8LE(void);
-
-	void WriteStringLE(std::string value);
-	std::string ReadStringLE(void);
+	void WriteChar8LE(char letter);
+	char ReadChar8LE(void);
 
 private:
-	std::vector<uint8_t> mBuffer;
+	std::vector<char> mBuffer;
 
 	int mReadIndex;
 	int mWriteIndex;

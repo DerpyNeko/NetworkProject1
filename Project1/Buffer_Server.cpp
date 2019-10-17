@@ -4,7 +4,6 @@
 
 #include "Buffer_Server.h"
 
-//Constructor
 Buffer::Buffer(size_t size) : mWriteIndex(0), mReadIndex(0)
 {
 	mBuffer.resize(size);
@@ -16,6 +15,17 @@ void Buffer::ResizeBuffer(size_t size)
 	mBuffer.resize(size);
 }
 
+// Gets the buffer contents
+std::vector<char> Buffer::GetBuffer()
+{
+	return mBuffer;
+}
+
+// Sets buffer content to the buffer given
+void Buffer::SetBuffer(std::vector<char> buffer)
+{
+	mBuffer = buffer;
+}
 
 //Serializes the int value to the end of the buffer
 void Buffer::WriteInt32LE(int value)
@@ -26,7 +36,6 @@ void Buffer::WriteInt32LE(int value)
 	mBuffer[mWriteIndex + 3] = value >> 24;
 
 	mWriteIndex += 4;
-
 }
 
 //Deserializes an int value at the end of the buffer
@@ -62,31 +71,16 @@ short Buffer::ReadShort16LE(void)
 }
 
 // Serializes the char value to the end of the buffer
-//void Buffer::WriteChar8LE(uint8_t value)
-//{
-//	mBuffer[mWriteIndex] = value;
-//	mWriteIndex += 1;
-//
-//}
+void Buffer::WriteChar8LE(char value)
+{
+	mBuffer[mWriteIndex] = value;
+	mWriteIndex += 1;
+}
 
 //Deserializes an char value at the end of the buffer
-//char Buffer::ReadChar8LE(void)
-//{
-//	char value = mBuffer[mReadIndex];
-//	mReadIndex += 1;
-//	return value;
-//}
-
-//void Buffer::WriteStringLE(std::string message)
-//{
-//  get size of message
-//  for loop of size
-//  get each char in message as letter
-//	mBuffer[mWriteIndex] = letter;
-//	mWriteIndex += 1;
-//  end loop
-//}
-
-//std::string Buffer::ReadStringLE(void)
-//{
-//}
+char Buffer::ReadChar8LE(void)
+{
+	char value = mBuffer[mReadIndex];
+	mReadIndex += 1;
+	return value;
+}

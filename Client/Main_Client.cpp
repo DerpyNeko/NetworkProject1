@@ -1,140 +1,143 @@
-#define WIN32_LEAN_AND_MEAN // Strips out rarely used calls
+// Main_Client.cpp
+// Jenny Moon & Ryan O'Donnell
+// Chatroom client for the server
 
-#include <Windows.h>
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#include <stdlib.h>
-#include <stdio.h>
+#define WIN32_LEAN_AND_MEAN // Strips out rarely used calls
 
 // Need to link with Ws2_32.lib
 #pragma comment (lib, "Ws2_32.lib")
 
-#define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT "5150"
+#include <Windows.h>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <iostream>
 
-int main(int argc, char** argv)
+#include "Buffer_Client.h"
+#include "Protocol_Client.h"
+
+SOCKET Connection;
+int commandID;
+bool run = true;
+void ClientThread();
+
+int main(void)
 {
-	WSADATA wsaData;
-	int iResult;
-
-	// Initialize Winsock
-	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-
-	if (iResult != 0)
+	//Winsock Startup
+	WSAData wsaData;
+	if (WSAStartup(MAKEWORD(2, 1), &wsaData) != 0)
 	{
-		// Something went wrong, tell the user the error id
-		printf("WSAStartup() failed with error: %d\n", iResult);
-		return 1;
-	}
-	else
-	{
-		printf("WSAStartup() was successful!\n");
+		MessageBox(NULL, "Winsock startup failed", "Error", MB_OK | MB_ICONERROR);
+		exit(1);
 	}
 
-	// #1 - Socket
-	SOCKET connectSocket = INVALID_SOCKET;
+	// Socket addres info
+	SOCKADDR_IN addr;
 
-	struct addrinfo *result = NULL;
-	struct addrinfo *ptr = NULL;
-	struct addrinfo hints;
+	int sizeofadr = sizeof(addr);
+	inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr.s_addr);
+	addr.sin_port = htons(1234567);
+	addr.sin_family = AF_INET; //IPv4 
 
-	ZeroMemory(&hints, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-
-	// Resolve the server address and port
-	iResult = getaddrinfo("127.0.0.1", DEFAULT_PORT, &hints, &result);
-	if (iResult != 0)
+	Connection = socket(AF_INET, SOCK_STREAM, NULL); //Creates connection socket
+	if (connect(Connection, (SOCKADDR*)&addr, sizeofadr) != 0)
 	{
-		printf("getaddrinfo() failed with error: %d\n", iResult);
-		WSACleanup();
-		return 1;
-	}
-	else
-	{
-		printf("getaddrinfo() was successful!\n");
+		MessageBox(NULL, "Failed to connect", "Error", MB_OK | MB_ICONERROR);
 	}
 
-	// #2 - Connect
-	// Attempt to connect to the server until a socket succeeds
-	for (ptr = result; ptr != NULL; ptr = ptr->ai_next)
+	std::cout << "Connected!" << std::endl;
+
+	std::cout << "Enter name: ";
+	commandID = -1;
+	Protocol* nameProtocol = new Protocol();
+	nameProtocol->CreateBuffer(256);
+	std::string input = "";
+	std::getline(std::cin, input);
+
+	nameProtocol->messageBody.name = input.c_str();
+	nameProtocol->SendName(*nameProtocol->buffer);
+	std::cout << "Name: " << nameProtocol->messageBody.name << std::endl;
+	commandID = 2;
+
+	std::vector<char> packet = nameProtocol->buffer->GetBuffer();
+	send(Connection, &packet[0], packet.size(), 0);
+
+	CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientThread, NULL, NULL, NULL); //Create a thread
+
+	while (true)
 	{
-		// Create a SOCKET for connecting to the server
-		connectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-		if (connectSocket == INVALID_SOCKET)
+		Protocol* messageSendProtocol = new Protocol();
+
+		std::string input = "";
+		std::getline(std::cin, input);
+		messageSendProtocol->CreateBuffer(8);
+		messageSendProtocol->messageHeader.commandId = commandID;
+
+		std::cout << "CommandID: " << commandID << std::endl;
+
+		if (input == "LeaveRoom")
 		{
-			printf("socket() failed with error code %d\n", WSAGetLastError());
-			freeaddrinfo(result);
-			WSACleanup();
-			return 1;
+			if (messageSendProtocol->messageBody.roomName != "")
+			{
+				messageSendProtocol->LeaveRoom(*messageSendProtocol->buffer);
+				std::vector<char> packet = messageSendProtocol->buffer->GetBuffer();
+				send(Connection, &packet[0], packet.size(), 0);
+				continue;
+			}
 		}
 
-		// Attempt to connect to the server
-		iResult = connect(connectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-		if (iResult == SOCKET_ERROR)
+		else if (commandID == 1)
 		{
-			printf("connect() failed\n");
-			closesocket(connectSocket);
-			connectSocket = INVALID_SOCKET;
-			continue;
+			messageSendProtocol->messageBody.message = input.c_str();
+			messageSendProtocol->SendMessages(*messageSendProtocol->buffer);
 		}
-		break;
+		else if (commandID == 2)
+		{
+			messageSendProtocol->messageBody.roomName = input.c_str();
+			messageSendProtocol->JoinRoom(*messageSendProtocol->buffer);
+			std::cout << "Room Name: " << messageSendProtocol->messageBody.roomName << std::endl;
+		}
+		std::vector<char> packet = messageSendProtocol->buffer->GetBuffer();
+		send(Connection, &packet[0], packet.size(), 0);
+		Sleep(10);
 	}
 
-	freeaddrinfo(result);
-
-	if (connectSocket == INVALID_SOCKET)
-	{
-		printf("Unsblr yo connect to the server\n");
-		WSACleanup();
-		return 1;
-	}
-
-	printf("Successfully connected to the server\n");
-
-	// #3 - Write & Read
-	const char* buffer = "Hello Server";
-
-	printf("Sending a packet to the sever\n");
-	iResult = send(connectSocket, buffer, (int)strlen(buffer), 0);
-
-	if (iResult == SOCKET_ERROR)
-	{
-		printf("send() failed with error: %d\n", WSAGetLastError());
-		closesocket(connectSocket);
-		WSACleanup();
-		return 1;
-	}
-
-	printf("Bytes sent: %d\n", iResult);
-
-	// Receive a message from the server before quitting
-
-	char recvbuf[DEFAULT_BUFLEN];
-	int recvbuflen = DEFAULT_BUFLEN;
-
-	printf("Waiting to receive data from the server\n");
-	iResult = recv(connectSocket, recvbuf, recvbuflen, 0);
-	if (iResult > 0)
-	{
-		printf("Bytes received:%d\n", iResult);
-	}
-	else if (iResult == 0)
-	{
-		printf("Connection closed\n");
-	}
-	else
-	{
-		printf("recv failed with error: %d\n", WSAGetLastError());
-		closesocket(connectSocket);
-		WSACleanup();
-		return 1;
-	}
-
-	// #4 - Close
-	closesocket(connectSocket);
-	WSACleanup();
-
+	system("pause");
 	return 0;
+}
+
+// Handle the client thread and receives messages from the server
+void ClientThread()
+{
+	std::vector<char> packet(512);
+	int packLength;
+	while (run)
+	{
+		if ((packLength = recv(Connection, &packet[0], packet.size(), NULL)) < 1) {
+			std::cout << "Closing connection" << std::endl;
+			closesocket(Connection);
+			WSACleanup();
+			run = false;
+		}
+		else
+		{
+			Protocol* messageProtocol = new Protocol();
+			messageProtocol->CreateBuffer(512);
+
+			messageProtocol->buffer->SetBuffer(packet);
+			messageProtocol->ReadHeader(*messageProtocol->buffer);
+
+			messageProtocol->buffer->ResizeBuffer(messageProtocol->messageHeader.packetLength);
+			if (messageProtocol->messageHeader.commandId == 1)
+			{
+				// Do something here
+			}
+			else {
+				messageProtocol->ReceiveMessage(*messageProtocol->buffer);
+				std::cout << messageProtocol->messageBody.message << std::endl;
+				commandID = messageProtocol->messageHeader.commandId;
+			}
+			delete messageProtocol;
+			//packet.clear();
+		}
+	}
 }
