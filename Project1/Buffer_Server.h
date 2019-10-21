@@ -10,11 +10,9 @@
 class Buffer {
 public:
 	Buffer(size_t size);
+	std::vector<char> mBuffer;
 
 	void ResizeBuffer(size_t size);
-
-	std::vector<char> GetBuffer();
-	void SetBuffer(std::vector<char> buffer);
 
 	void WriteInt32LE(int value);
 	int ReadInt32LE(void);
@@ -26,7 +24,6 @@ public:
 	char ReadChar8LE(void);
 
 private:
-	std::vector<char> mBuffer;
 
 	int mReadIndex;
 	int mWriteIndex;

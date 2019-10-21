@@ -15,18 +15,6 @@ void Buffer::ResizeBuffer(size_t size)
 	mBuffer.resize(size);
 }
 
-// Gets the buffer contents
-std::vector<char> Buffer::GetBuffer()
-{
-	return mBuffer;
-}
-
-// Sets buffer content to the buffer given
-void Buffer::SetBuffer(std::vector<char> buffer)
-{
-	mBuffer = buffer;
-}
-
 //Serializes the int value to the end of the buffer
 void Buffer::WriteInt32LE(int value)
 {
@@ -63,7 +51,7 @@ void Buffer::WriteShort16LE(short value)
 //Deserializes an short value at the end of the buffer
 short Buffer::ReadShort16LE(void)
 {
-	char value = mBuffer[mReadIndex];
+	short value = mBuffer[mReadIndex];
 	value |= mBuffer[mReadIndex + 1] << 8;
 
 	mReadIndex += 2;

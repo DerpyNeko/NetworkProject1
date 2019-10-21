@@ -70,10 +70,11 @@ int main()
 			Clients[i].Connection = newConnection;
 			lobby.push_back(clientsCounter);
 			clientsCounter++;
-			std::cout << "Lobby size: " << lobby.size() << std::endl;
+			std::cout << "Number of Connections: " << lobby.size() << std::endl;
 			CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)HandleClients, (LPVOID)(i), NULL, NULL); //Create a thread 
 		}
 	}
+
 	system("pause");
 	return 0;
 }
@@ -81,144 +82,140 @@ int main()
 void HandleClients(int index)
 {
 	int packLength;
-	std::string name = "";
 	bool run = true;
 
 	while (run)
 	{
 		std::vector<char> packet(512);
-		//if ((packLength = recv(Clients[index].Connection, &packet[0], packet.size(), NULL)) < 1) {
-		//	closesocket(Clients[index].Connection);
-		//	//WSACleanup();
-
+		if ((packLength = recv(Clients[index].Connection, &packet[0], packet.size(), NULL)) < 1) 
+		{
+			closesocket(Clients[index].Connection);
+			run = false;
+		}
+		else
+		{
 			Protocol* messageProtocol = new Protocol();
 			messageProtocol->CreateBuffer(512);
 
-			messageProtocol->buffer->SetBuffer(packet);
+			messageProtocol->buffer->mBuffer = packet;
 			messageProtocol->ReadHeader(*messageProtocol->buffer);
 
-			if (messageProtocol->messageHeader.commandId == 7) //create name
+			// Create name
+			if (messageProtocol->messageHeader.commandId == 1)
 			{
 				messageProtocol->ReceiveName(*messageProtocol->buffer);
 				Clients[index].name = messageProtocol->messageBody.name;
-				std::string greet = "Hello [" + messageProtocol->messageBody.name + "]!";
-				SendMessageToClient(Clients[index].Connection, 0, greet);
-
-				std::string setGroup = "\nEnter a number (1 - 3) to join a room!\n"
-					"1 - Prequel Memes, 2 - Chonkers, 3 - Rare puppers (to leave room send LeaveRoom)"; 
-				SendMessageToClient(Clients[index].Connection, 2, setGroup);
-
-				continue;
+				std::string greet = "Hello [" + messageProtocol->messageBody.name + "]!\nEnter a number (1 - 3) to join a room!\n1 - Prequel Memes, 2 - Chonkers, 3 - Rare puppers";
+				SendMessageToClient(Clients[index].Connection, 2, greet);
 			}
 
-			if (messageProtocol->messageHeader.commandId == 3) //leave the room
-			{
-				std::string message = "*" + Clients[index].name + "* left the room";
-				SendMessageToAllInGroup(Clients[index].room, 1, message);
-				Clients[index].room = "";
-
-				std::string setGroup = "\nEnter a number (1 - 3) to join a room!\n"
-					"1 - Prequelmemes, 2 - Chonkers, 3 - Rarepuppers (to leave room send LeaveRoom)";
-				SendMessageToClient(Clients[index].Connection, 2, setGroup);
-
-				continue;
-
-			}
-
-			if (messageProtocol->messageHeader.commandId == 2) //join the room
-			{
+			// Join the room
+			if (messageProtocol->messageHeader.commandId == 2) 
+			{				
+				std::string setRoom = "\nEnter \'LeaveRoom\' to leave room";
+				SendMessageToClient(Clients[index].Connection, 2, setRoom);
+				
 				messageProtocol->JoinRoom(*messageProtocol->buffer);
+
 				if (messageProtocol->messageBody.roomName == "1")
 				{
 					Clients[index].room = "Prequelmemes";
-					std::string message = "[" + Clients[index].name + "] has joined the room Prequelmemes.";
-					SendMessageToAllInGroup("Prequelmemes", 1, message);
-					continue;
+					std::string message = "[" + Clients[index].name + "] has joined the room Prequelmemes";
+					SendMessageToAllInGroup("Prequelmemes", 4, message);
 				}
 				else if (messageProtocol->messageBody.roomName == "2")
 				{
 					Clients[index].room = "Chonkers";
-					std::string message = "[" + Clients[index].name + "] has joined the room Chonkers.";
-					SendMessageToAllInGroup("Chonkers", 1, message);
-					continue;
+					std::string message = "[" + Clients[index].name + "] has joined the room Chonkers";
+					SendMessageToAllInGroup("Chonkers", 4, message);
 				}
 				else if (messageProtocol->messageBody.roomName == "3")
 				{
 					Clients[index].room = "Rarepuppers";
-					std::string message = "[" + Clients[index].name + "] has joined the room Rarepuppers.";
-					SendMessageToAllInGroup("Rarepuppers", 1, message);
-					continue;
+					std::string message = "[" + Clients[index].name + "] has joined the room Rarepuppers";
+					SendMessageToAllInGroup("Rarepuppers", 4, message);
 				}
 				else {
-					std::string setGroup = "\nWrong group number! Try again!\n"
-						"1 - Prequlmemes, 2 - Chonkers, 3 - Rarepuppers"; 
+					std::string setGroup = "\nWrong group number! Try again!\n1 - Prequelmemes, 2 - Chonkers, 3 - Rarepuppers";
 					SendMessageToClient(Clients[index].Connection, 2, setGroup);
-					continue;
 				}
 			}
+			
+			// Leave the room
+			if (messageProtocol->messageHeader.commandId == 3) 
+			{
+				std::string message = "[" + Clients[index].name + "] left the room";
+				SendMessageToAllInGroup(Clients[index].room, 4, message);
+				Clients[index].room = "";
 
-			if (messageProtocol->messageHeader.commandId == 1)
+				std::string setRoom = "\nEnter a number(1 - 3) to join a room!\n1 - Prequel Memes, 2 - Chonkers, 3 - Rare puppers";
+					SendMessageToClient(Clients[index].Connection, 2, setRoom);
+			}
+
+			// Send message
+			if (messageProtocol->messageHeader.commandId == 4)
 			{
 				messageProtocol->ReceiveMessage(*messageProtocol->buffer);
-				std::cout << messageProtocol->messageBody.name << ": " << messageProtocol->messageBody.message << std::endl;
-				std::string message = messageProtocol->messageBody.name + ">> " + messageProtocol->messageBody.message;
-				SendMessageOthersInGroup(index, Clients[index].room, 1, message);
+				std::cout << "[" << Clients[index].room << "][" << messageProtocol->messageBody.name << "]: " << messageProtocol->messageBody.message << std::endl;
+				std::string message = "[" + messageProtocol->messageBody.name + "]: " + messageProtocol->messageBody.message;
+				SendMessageOthersInGroup(index, Clients[index].room, 4, message);
 			}
 
 			packLength = 0;
 			packet.clear();
 			delete messageProtocol;
+		}
 	}
 }
 
+// Sends message to current client
 void SendMessageToClient(SOCKET theConnection, int id, std::string message)
 {
 	Protocol* messageSendProtocol = new Protocol();
+	messageSendProtocol->CreateBuffer(512);
 	messageSendProtocol->messageHeader.commandId = id;
 	messageSendProtocol->messageBody.message = message;
-	messageSendProtocol->CreateBuffer(4);
 	messageSendProtocol->SendMessages(*messageSendProtocol->buffer, id);
 
-	std::vector<char> packet = messageSendProtocol->buffer->GetBuffer();
+	std::vector<char> packet = messageSendProtocol->buffer->mBuffer;
 	send(theConnection, &packet[0], packet.size(), 0);
 
 	delete messageSendProtocol;
 }
 
+// Broadcasts to all (Join/Leave)
 void SendMessageToAllInGroup(std::string groupName, int id, std::string message)
 {
 	Protocol* messageSendProtocol = new Protocol();
+	messageSendProtocol->CreateBuffer(512);
+
 	messageSendProtocol->messageHeader.commandId = id;
-
 	messageSendProtocol->messageBody.message = message;
-	messageSendProtocol->CreateBuffer(4);
-	messageSendProtocol->SendMessages(*messageSendProtocol->buffer);
+	
+	messageSendProtocol->SendMessages(*messageSendProtocol->buffer, id);
 
-	std::vector<char> packet = messageSendProtocol->buffer->GetBuffer();
+	std::vector<char> packet = messageSendProtocol->buffer->mBuffer;
 	for (int i = 0; i < clientsCounter; i++)
 	{
 		if (Clients[i].room == groupName)
 		{
 			send(Clients[i].Connection, &packet[0], packet.size(), 0);
 		}
-		else
-		{
-			continue;
-		}
 	}
 	delete messageSendProtocol;
 }
 
+// Messages others in the room 
 void SendMessageOthersInGroup(int clientIndex, std::string roomName, int id, std::string message)
 {
 	Protocol* messageSendProtocol = new Protocol();
+	messageSendProtocol->CreateBuffer(512);
 	messageSendProtocol->messageHeader.commandId = id;
 
 	messageSendProtocol->messageBody.message = message;
-	messageSendProtocol->CreateBuffer(4);
-	messageSendProtocol->SendMessages(*messageSendProtocol->buffer);
+	messageSendProtocol->SendMessages(*messageSendProtocol->buffer, id);
 
-	std::vector<char> packet = messageSendProtocol->buffer->GetBuffer();
+	std::vector<char> packet = messageSendProtocol->buffer->mBuffer;
 	for (int i = 0; i < clientsCounter; i++)
 	{
 		if (clientIndex == i)
@@ -230,5 +227,6 @@ void SendMessageOthersInGroup(int clientIndex, std::string roomName, int id, std
 			send(Clients[i].Connection, &packet[0], packet.size(), 0);
 		}
 	}
+
 	delete messageSendProtocol;
 }

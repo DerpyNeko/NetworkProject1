@@ -47,7 +47,6 @@ int main(void)
 	std::cout << "Connected!" << std::endl;
 
 	std::cout << "Enter name: ";
-	commandID = -1;
 	Protocol* nameProtocol = new Protocol();
 	nameProtocol->CreateBuffer(256);
 	std::string input = "";
@@ -55,10 +54,8 @@ int main(void)
 
 	nameProtocol->messageBody.name = input.c_str();
 	nameProtocol->SendName(*nameProtocol->buffer);
-	std::cout << "Name: " << nameProtocol->messageBody.name << std::endl;
-	commandID = 2;
 
-	std::vector<char> packet = nameProtocol->buffer->GetBuffer();
+	std::vector<char> packet = nameProtocol->buffer->mBuffer;
 	send(Connection, &packet[0], packet.size(), 0);
 
 	CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientThread, NULL, NULL, NULL); //Create a thread
@@ -69,34 +66,29 @@ int main(void)
 
 		std::string input = "";
 		std::getline(std::cin, input);
-		messageSendProtocol->CreateBuffer(8);
+		messageSendProtocol->CreateBuffer(256);
 		messageSendProtocol->messageHeader.commandId = commandID;
 
-		std::cout << "CommandID: " << commandID << std::endl;
-
-		if (input == "LeaveRoom")
-		{
-			if (messageSendProtocol->messageBody.roomName != "")
-			{
-				messageSendProtocol->LeaveRoom(*messageSendProtocol->buffer);
-				std::vector<char> packet = messageSendProtocol->buffer->GetBuffer();
-				send(Connection, &packet[0], packet.size(), 0);
-				continue;
-			}
-		}
-
-		else if (commandID == 1)
-		{
-			messageSendProtocol->messageBody.message = input.c_str();
-			messageSendProtocol->SendMessages(*messageSendProtocol->buffer);
-		}
-		else if (commandID == 2)
+		if (commandID == 2)
 		{
 			messageSendProtocol->messageBody.roomName = input.c_str();
 			messageSendProtocol->JoinRoom(*messageSendProtocol->buffer);
-			std::cout << "Room Name: " << messageSendProtocol->messageBody.roomName << std::endl;
 		}
-		std::vector<char> packet = messageSendProtocol->buffer->GetBuffer();
+		else if (commandID == 4)
+		{
+			if (input == "LeaveRoom")
+			{
+				messageSendProtocol->LeaveRoom(*messageSendProtocol->buffer);
+			}
+			else
+			{
+				messageSendProtocol->messageBody.name = nameProtocol->messageBody.name;
+				messageSendProtocol->messageBody.message = input.c_str();
+				messageSendProtocol->SendMessages(*messageSendProtocol->buffer);
+			}
+		}
+
+		std::vector<char> packet = messageSendProtocol->buffer->mBuffer;
 		send(Connection, &packet[0], packet.size(), 0);
 		Sleep(10);
 	}
@@ -123,21 +115,16 @@ void ClientThread()
 			Protocol* messageProtocol = new Protocol();
 			messageProtocol->CreateBuffer(512);
 
-			messageProtocol->buffer->SetBuffer(packet);
+			messageProtocol->buffer->mBuffer = packet;
 			messageProtocol->ReadHeader(*messageProtocol->buffer);
 
 			messageProtocol->buffer->ResizeBuffer(messageProtocol->messageHeader.packetLength);
-			if (messageProtocol->messageHeader.commandId == 1)
-			{
-				// Do something here
-			}
-			else {
-				messageProtocol->ReceiveMessage(*messageProtocol->buffer);
-				std::cout << messageProtocol->messageBody.message << std::endl;
-				commandID = messageProtocol->messageHeader.commandId;
-			}
+			
+			messageProtocol->ReceiveMessage(*messageProtocol->buffer);
+			std::cout << messageProtocol->messageBody.message << std::endl;
+			commandID = messageProtocol->messageHeader.commandId;
+
 			delete messageProtocol;
-			//packet.clear();
 		}
 	}
 }

@@ -3,6 +3,7 @@
 // Serialization and deserialization of basic types
 
 #include "Buffer_Server.h"
+#include <iostream>
 
 Buffer::Buffer(size_t size) : mWriteIndex(0), mReadIndex(0)
 {
@@ -13,18 +14,6 @@ Buffer::Buffer(size_t size) : mWriteIndex(0), mReadIndex(0)
 void Buffer::ResizeBuffer(size_t size)
 {
 	mBuffer.resize(size);
-}
-
-// Gets the buffer contents
-std::vector<char> Buffer::GetBuffer()
-{
-	return mBuffer;
-}
-
-// Sets buffer content to the buffer given
-void Buffer::SetBuffer(std::vector<char> buffer)
-{
-	mBuffer = buffer;
 }
 
 //Serializes the int value to the end of the buffer
@@ -63,10 +52,11 @@ void Buffer::WriteShort16LE(short value)
 //Deserializes an short value at the end of the buffer
 short Buffer::ReadShort16LE(void)
 {
-	char value = mBuffer[mReadIndex];
+	short value = mBuffer[mReadIndex];
 	value |= mBuffer[mReadIndex + 1] << 8;
-
+	
 	mReadIndex += 2;
+
 	return value;
 }
 
@@ -82,5 +72,6 @@ char Buffer::ReadChar8LE(void)
 {
 	char value = mBuffer[mReadIndex];
 	mReadIndex += 1;
+
 	return value;
 }

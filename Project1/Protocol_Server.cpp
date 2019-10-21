@@ -45,11 +45,6 @@ void Protocol::JoinRoom(Buffer &myBuffer)
 	}
 }
 
-void Protocol::LeaveRoom(Buffer &myBuffer)
-{
-
-}
-
 void Protocol::ReceiveMessage(Buffer &myBuffer)
 {
 	ReceiveName(myBuffer);
@@ -64,22 +59,6 @@ void Protocol::ReceiveMessage(Buffer &myBuffer)
 void Protocol::SendMessages(Buffer &myBuffer, int id)
 {
 	this->messageHeader.commandId = id;
-	this->messageHeader.packetLength = sizeof(int) + sizeof(short) + sizeof(int) + this->messageBody.message.length();
-
-	myBuffer.ResizeBuffer(this->messageHeader.packetLength);
-	myBuffer.WriteInt32LE(this->messageHeader.packetLength);
-	myBuffer.WriteShort16LE(this->messageHeader.commandId);
-	myBuffer.WriteInt32LE(this->messageBody.message.length());
-	const  char *temp = this->messageBody.message.c_str();
-	for (int i = 0; temp[i] != '\0'; i++)
-	{
-		myBuffer.WriteChar8LE(temp[i]);
-	}
-}
-
-void Protocol::SendMessages(Buffer &myBuffer)
-{
-	this->messageHeader.commandId = 01;
 	this->messageHeader.packetLength = sizeof(int) + sizeof(short) + sizeof(int) + this->messageBody.message.length();
 
 	myBuffer.ResizeBuffer(this->messageHeader.packetLength);
